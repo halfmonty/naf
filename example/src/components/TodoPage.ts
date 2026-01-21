@@ -80,7 +80,7 @@ export function TodoPage(): Component {
       )}
       ${template`
         <div class="stats-wrapper">
-          ${Stats({ activeCount: activeCount(), totalCount: totalCount() })}
+          ${Stats({ activeCount, totalCount })}
         </div>
       `}
     </div>
