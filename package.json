@@ -1,0 +1,38 @@
+{
+  "name": "naf",
+  "version": "0.1.0",
+  "description": "NAF (Not A Framework) - A ~2KB gzipped reactive framework for building SPAs without dependencies. Copy naf.ts directly into your project.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
+    "example": "cd example && npm install && npm run dev",
+    "type-check": "tsc --noEmit",
+    "build": "esbuild naf.ts --bundle --minify --format=esm --outfile=dist/naf.min.js",
+    "compress": "npm run build && gzip -k -f dist/naf.min.js && brotli -k -f dist/naf.min.js",
+    "size": "npm run compress && ls -lh dist/naf.min.js*"
+  },
+  "keywords": [
+    "framework",
+    "reactive",
+    "spa",
+    "signals",
+    "frontend",
+    "vanilla",
+    "lightweight",
+    "zero-dependencies"
+  ],
+  "author": "halfmonty",
+  "license": "MIT",
+  "devDependencies": {
+    "@vitest/ui": "^1.0.4",
+    "esbuild": "^0.20.0",
+    "happy-dom": "^12.10.3",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.10",
+    "vitest": "^1.0.4"
+  }
+}
