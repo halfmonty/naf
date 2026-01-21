@@ -32,7 +32,7 @@ export function Stats(props: {
           totalEl.textContent = String(props.totalCount());
         });
       },
-    })`
+    }) /*html*/ `
       <div class="stats-content">
         <div class="stat">
           <strong>0</strong>

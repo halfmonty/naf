@@ -9,7 +9,7 @@ export function TodoList(props: {
   onDelete: (id: number) => void;
 }): Component {
   return Card({
-    children: template`
+    children: template /*html*/ `
       <div class="todo-list">
         ${each(
           () => props.todos,

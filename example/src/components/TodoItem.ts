@@ -18,7 +18,7 @@ export function TodoItem(props: {
       checkbox.addEventListener("change", () => props.onToggle(props.todo.id));
       deleteBtn.addEventListener("click", () => props.onDelete(props.todo.id));
     },
-  })`
+  }) /*html*/ `
     <div class="todo-item ${props.todo.done ? "done" : ""}" data-id="${props.todo.id}">
       <input type="checkbox" ${props.todo.done ? "checked" : ""} />
       <span class="todo-text">${text(props.todo.text)}</span>

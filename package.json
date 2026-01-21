@@ -1,7 +1,7 @@
 {
   "name": "naf",
   "version": "0.1.0",
-  "description": "NAF (Not A Framework) - A ~2KB gzipped reactive framework for building SPAs without dependencies. Copy naf.ts directly into your project.",
+  "description": "NAF (Not A Framework) - A ~1.6KB gzipped reactive framework for building SPAs without dependencies. Copy naf.ts directly into your project.",
   "private": true,
   "type": "module",
   "scripts": {

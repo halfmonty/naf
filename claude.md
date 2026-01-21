@@ -1,6 +1,6 @@
 # naf.ts - (Not A Framework) Vanilla SPA Framework
 
-A ~2KB gzipped reactive framework for building SPAs without dependencies.
+A ~1.6KB gzipped reactive framework for building SPAs without dependencies.
 
 ## Core Architecture
 

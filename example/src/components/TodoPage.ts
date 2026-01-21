@@ -58,7 +58,7 @@ export function TodoPage(): Component {
   };
 
   // Render
-  return template`
+  return template /*html*/ `
     <div class="app">
       ${Header()}
       ${AddTodoForm({ newTodoText, onAdd: addTodo })}
@@ -78,7 +78,7 @@ export function TodoPage(): Component {
         },
         () => EmptyState({ filter: filter() }),
       )}
-      ${template`
+      ${template /*html*/ `
         <div class="stats-wrapper">
           ${Stats({ activeCount, totalCount })}
         </div>

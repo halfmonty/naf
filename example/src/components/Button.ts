@@ -22,7 +22,7 @@ export function Button(props: {
         });
       }
     },
-  })`
+  }) /*html*/ `
     <button class="${props.className || ""}">${props.text}</button>
   `;
 }

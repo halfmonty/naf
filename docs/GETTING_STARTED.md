@@ -4,7 +4,7 @@ Welcome to NAF (Not A Framework)! This guide will help you build your first appl
 
 ## What is NAF?
 
-NAF is a ~2KB reactive library for building single-page applications with zero dependencies. It provides:
+NAF is a ~1.6KB gzipped reactive library for building single-page applications with zero dependencies. It provides:
 
 - **Reactive state management** with signals and computed values
 - **Component system** with template literals

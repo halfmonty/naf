@@ -2,17 +2,17 @@ import { template, Component } from "../../../naf";
 import { Card } from "./Card";
 
 export function Home(): Component {
-  return template`
+  return template /*html*/ `
     <div class="home">
       <h1>NAF</h1>
       <p class="tagline">Not A Framework - Vanilla SPA Helper Functions</p>
 
       ${Card({
-        children: template`
+        children: template /*html*/ `
           <div class="about-section">
             <h2>What is NAF?</h2>
             <p>
-              NAF is a ~2KB gzipped collection of helper functions for building
+              NAF is a ~1.6KB gzipped collection of helper functions for building
               single-page applications with vanilla JavaScript/TypeScript.
               No virtual DOM, no build step required, just copy and use.
             </p>
@@ -21,7 +21,7 @@ export function Home(): Component {
       })}
 
       ${Card({
-        children: template`
+        children: template /*html*/ `
           <div class="features-section">
             <h2>Features</h2>
             <ul>
@@ -38,7 +38,7 @@ export function Home(): Component {
       })}
 
       ${Card({
-        children: template`
+        children: template /*html*/ `
           <div class="philosophy-section">
             <h2>Philosophy</h2>
             <p>
@@ -51,7 +51,7 @@ export function Home(): Component {
       })}
 
       ${Card({
-        children: template`
+        children: template /*html*/ `
           <div class="try-section">
             <h2>Try It</h2>
             <p>

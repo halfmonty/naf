@@ -2,9 +2,9 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
-[![Bundle Size](https://img.shields.io/badge/bundle%20size-~2KB-success)](https://github.com/yourusername/naf)
+[![Bundle Size](https://img.shields.io/badge/bundle%20size-~1.6KB-success)](https://github.com/yourusername/naf)
 
-A ~2KB gzipped reactive functions library for building SPAs with zero dependencies.
+A ~1.6KB gzipped reactive functions library for building SPAs with zero dependencies.
 
 ## ⚡ Quick Install
 
@@ -33,7 +33,7 @@ import { signal, computed, template } from './naf';
 - ✅ **Understandable** - Small enough to read (13KB source)
 - ✅ **No breaking changes** - Update only when you want to
 
-> **Why copy instead of install?** Read our [philosophy document](PHILOSOPHY.md) to understand the copy-first approach.
+Don't like the name? Feel free to rename it to something more fitting for your project.
 
 ## Quick Start
 
@@ -73,9 +73,7 @@ app.mount(document.querySelector('#app')!);
 A complete todo app example is included in the `example/` directory:
 
 ```bash
-cd example
-npm install
-npm run dev
+npm run example
 ```
 
 Visit `http://localhost:3000` to see the todo app in action.
@@ -138,7 +136,7 @@ function Home(): Component {
     onClick: () => console.log('clicked')
   });
 
-  return template`
+  return template/*html*/`
     <div class="page">
       ${header}
       <main>${button}</main>
@@ -819,6 +817,7 @@ handleRoute(); // Initial route
 - Similar to Vue 3's reactivity but simplified
 
 **Inspiration:**
+- Vanjs being so darn tiny
 - Vue 3 reactivity
 - Solid.js rendering model
 - Lit HTML template syntax
@@ -885,21 +884,9 @@ naf/
 └── readme.md
 ```
 
-## Contributing
-
-Contributions are welcome! Please ensure:
-- All tests pass (`npm test`)
-- New features include tests
-- Keep the bundle size small
-- Maintain zero runtime dependencies
-
-The philosophy is to keep NAF as a single, self-contained file that anyone can copy and use.
-
 ## Philosophy
 
 NAF embraces a **copy-first approach** - we encourage you to copy `naf.ts` directly into your project rather than installing it as a dependency. This gives you true zero dependencies, full code ownership, and complete control.
-
-**Read the full philosophy:** [PHILOSOPHY.md](PHILOSOPHY.md)
 
 ### Core Values
 

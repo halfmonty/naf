@@ -10,7 +10,7 @@ if (!root) {
 
 // Wrap pages with nav
 function withNav(page: () => ReturnType<typeof template>) {
-  return () => template`
+  return () => template /*html*/ `
     <div class="layout">
       ${Nav()}
       <main>
@@ -27,7 +27,7 @@ createRouter({
     "#/todos": withNav(TodoPage),
   },
   notFound: withNav(
-    () => template`
+    () => template /*html*/ `
     <div class="not-found">
       <h1>404</h1>
       <p>Page not found</p>

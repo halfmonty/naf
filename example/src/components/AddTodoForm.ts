@@ -39,7 +39,7 @@ export function AddTodoForm(props: {
           }
         });
       },
-    })`
+    }) /*html*/ `
       <div class="add-todo-form">
         <input
           type="text"

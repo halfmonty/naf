@@ -31,7 +31,7 @@ export function FilterButtons(props: {
           });
         });
       },
-    })`
+    }) /*html*/ `
       <div class="filters">
         <button class="secondary" data-filter="all">All</button>
         <button class="secondary" data-filter="active">Active</button>

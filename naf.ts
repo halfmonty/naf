@@ -1,7 +1,7 @@
 // ============================================================================
 // NAF (Not A Framework) - Vanilla SPA Helper Functions
 // ============================================================================
-// A ~2KB gzipped reactive framework for building SPAs with zero dependencies.
+// A ~1.6KB gzipped reactive framework for building SPAs with zero dependencies.
 // Based on alien-signals (MIT) for the reactivity system.
 // https://github.com/stackblitz/alien-signals
 // ============================================================================
@@ -84,7 +84,6 @@ interface Link {
 interface Dependency {
   subs?: Link;
   subsTail?: Link;
-  execute(): void;
 }
 
 /**
@@ -161,6 +160,36 @@ function link(dep: Dependency, sub: Subscriber): void {
 }
 
 /**
+ * Unlinks a subscriber from all its dependencies.
+ * @internal
+ */
+function unlink(sub: Subscriber): void {
+  let link = sub.deps;
+  while (link !== undefined) {
+    const nextLink = link.nextDep;
+    const dep = link.dep;
+
+    // Remove from dependency's subscriber list
+    if (link.prevSub !== undefined) {
+      link.prevSub.nextSub = link.nextSub;
+    } else {
+      dep.subs = link.nextSub;
+    }
+
+    if (link.nextSub !== undefined) {
+      link.nextSub.prevSub = link.prevSub;
+    } else {
+      dep.subsTail = link.prevSub;
+    }
+
+    link = nextLink;
+  }
+
+  sub.deps = undefined;
+  sub.depsTail = undefined;
+}
+
+/**
  * Notifies all subscribers of a dependency that it has changed.
  * Collects all subscribers first to avoid issues with mid-iteration modifications.
  * @internal
@@ -169,22 +198,16 @@ function notify(dep: Dependency): void {
   let link = dep.subs;
   if (link === undefined) return;
 
-  // Collect all subscribers first to avoid infinite loops
-  // when effects modify subscriptions during notification
-  const subscribers: EffectSubscriber[] = [];
-  const seen = new Set<EffectSubscriber>();
+  // Collect unique subscribers to avoid duplicate notifications
+  // and prevent issues when effects modify subscriptions during notification
+  const subscribers = new Set<EffectSubscriber>();
 
   do {
-    const sub = link.sub as EffectSubscriber;
-    // Only add each subscriber once to prevent duplicate notifications
-    if (!seen.has(sub)) {
-      seen.add(sub);
-      subscribers.push(sub);
-    }
+    subscribers.add(link.sub as EffectSubscriber);
     link = link.nextSub;
   } while (link !== undefined);
 
-  // Now notify all collected subscribers
+  // Notify all collected subscribers
   for (const sub of subscribers) {
     sub.fn();
   }
@@ -228,9 +251,6 @@ export function signal<T>(initialValue: T): {
     value: initialValue,
     subs: undefined,
     subsTail: undefined,
-    execute() {
-      notify(dep);
-    },
   };
 
   function signalFn(newValue?: T): T | void {
@@ -294,9 +314,6 @@ export function computed<T>(fn: () => T): () => T {
   const dep: Dependency = {
     subs: undefined,
     subsTail: undefined,
-    execute() {
-      notify(dep);
-    },
   };
 
   // Subscriber that tracks our dependencies
@@ -306,7 +323,7 @@ export function computed<T>(fn: () => T): () => T {
     fn() {
       // When dependencies change, mark dirty and notify consumers
       dirty = true;
-      dep.execute();
+      notify(dep);
     },
   };
 
@@ -321,30 +338,7 @@ export function computed<T>(fn: () => T): () => T {
       const prevSub = activeSub;
       activeSub = sub; // Start tracking dependencies
 
-      // Clear old dependencies completely
-      let link = sub.deps;
-      while (link !== undefined) {
-        const nextLink = link.nextDep;
-        const dep = link.dep;
-
-        // Remove this subscriber from dependency's list
-        if (link.prevSub !== undefined) {
-          link.prevSub.nextSub = link.nextSub;
-        } else {
-          dep.subs = link.nextSub;
-        }
-
-        if (link.nextSub !== undefined) {
-          link.nextSub.prevSub = link.prevSub;
-        } else {
-          dep.subsTail = link.prevSub;
-        }
-
-        link = nextLink;
-      }
-
-      sub.deps = undefined;
-      sub.depsTail = undefined;
+      unlink(sub); // Clear old dependencies
 
       try {
         value = fn();
@@ -415,36 +409,6 @@ export function effect(fn: () => void): () => void {
   };
 
   /**
-   * Unlinks this effect from all its dependencies.
-   * Called before re-running to clear old dependency tracking.
-   */
-  const cleanup = () => {
-    let link = sub.deps;
-    while (link !== undefined) {
-      const nextLink = link.nextDep;
-      const dep = link.dep;
-
-      // Remove this subscriber from dependency's list
-      if (link.prevSub !== undefined) {
-        link.prevSub.nextSub = link.nextSub;
-      } else {
-        dep.subs = link.nextSub;
-      }
-
-      if (link.nextSub !== undefined) {
-        link.nextSub.prevSub = link.prevSub;
-      } else {
-        dep.subsTail = link.prevSub;
-      }
-
-      link = nextLink;
-    }
-
-    sub.deps = undefined;
-    sub.depsTail = undefined;
-  };
-
-  /**
    * Runs the effect function with dependency tracking.
    * Cleans up old dependencies first to support conditional tracking.
    */
@@ -456,7 +420,7 @@ export function effect(fn: () => void): () => void {
     const prevSub = activeSub;
     activeSub = sub; // Start tracking dependencies
 
-    cleanup(); // Clear old dependencies before re-tracking
+    unlink(sub); // Clear old dependencies before re-tracking
 
     try {
       fn();
@@ -472,8 +436,8 @@ export function effect(fn: () => void): () => void {
   // Run effect immediately
   run();
 
-  // Return cleanup function
-  return cleanup;
+  // Return cleanup function that unlinks from all dependencies
+  return () => unlink(sub);
 }
 
 // ============================================================================
