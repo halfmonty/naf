@@ -1,4 +1,4 @@
-import { signal, template, effect, $$, Component } from "../../../naf";
+import { signal, template, $$, toggleClass, Component } from "../../../naf";
 import { Filter } from "./types";
 import { Card } from "./Card";
 
@@ -17,18 +17,13 @@ export function FilterButtons(props: {
             const filterValue = btn.getAttribute("data-filter") as Filter;
             props.currentFilter(filterValue);
           });
-        });
 
-        effect(() => {
-          const current = props.currentFilter();
-          buttons.forEach((btn) => {
-            const filterValue = btn.getAttribute("data-filter");
-            if (filterValue === current) {
-              btn.classList.add("active");
-            } else {
-              btn.classList.remove("active");
-            }
-          });
+          const filterValue = btn.getAttribute("data-filter");
+          toggleClass(
+            btn,
+            "active",
+            () => props.currentFilter() === filterValue,
+          );
         });
       },
     }) /*html*/ `

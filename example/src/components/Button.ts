@@ -1,4 +1,4 @@
-import { template, effect, Component } from "../../../naf";
+import { template, toggleAttr, Component } from "../../../naf";
 
 export function Button(props: {
   text: string;
@@ -11,16 +11,8 @@ export function Button(props: {
     onMount(el) {
       if (!el) return;
       el.addEventListener("click", props.onClick);
-
-      if (props.disabled) {
-        effect(() => {
-          if (props.disabled!()) {
-            el.setAttribute("disabled", "disabled");
-          } else {
-            el.removeAttribute("disabled");
-          }
-        });
-      }
+      if (props.disabled)
+        toggleAttr(el, "disabled", "disabled", props.disabled);
     },
   }) /*html*/ `
     <button class="${props.className || ""}">${props.text}</button>

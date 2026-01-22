@@ -1,4 +1,4 @@
-import { template, effect, Component } from "../../../naf";
+import { template, effect, $, Component } from "../../../naf";
 import { Card } from "./Card";
 
 export function Stats(props: {
@@ -11,17 +11,12 @@ export function Stats(props: {
       root: ".stats-content",
       onMount(el) {
         if (!el) return;
-        const activeEl = el.querySelector(
-          ".stat:first-child strong",
-        ) as HTMLElement;
-        const activeLabel = el.querySelector(
-          ".stat:first-child span",
-        ) as HTMLElement;
-        const totalEl = el.querySelector(
-          ".stat:last-child strong",
-        ) as HTMLElement;
+        const activeEl = $<HTMLElement>(el, ".stat:first-child strong");
+        const activeLabel = $<HTMLElement>(el, ".stat:first-child span");
+        const totalEl = $<HTMLElement>(el, ".stat:last-child strong");
 
         effect(() => {
+          if (!activeEl || !activeLabel) return;
           const active = props.activeCount();
           activeEl.textContent = String(active);
           activeLabel.textContent =
@@ -29,6 +24,7 @@ export function Stats(props: {
         });
 
         effect(() => {
+          if (!totalEl) return;
           totalEl.textContent = String(props.totalCount());
         });
       },

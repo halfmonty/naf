@@ -1,4 +1,4 @@
-import { signal, computed, template, when, Component } from "../../../naf";
+import { signal, computed, template, when, $, Component } from "../../../naf";
 import { Todo, Filter } from "./types";
 import { Header } from "./Header";
 import { AddTodoForm } from "./AddTodoForm";
@@ -42,10 +42,7 @@ export function TodoPage(): Component {
     newTodoText("");
 
     setTimeout(() => {
-      const input = document.querySelector(
-        ".add-todo-form input",
-      ) as HTMLInputElement;
-      if (input) input.focus();
+      $<HTMLInputElement>(document, ".add-todo-form input")?.focus();
     }, 0);
   };
 

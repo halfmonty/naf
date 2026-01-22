@@ -1,4 +1,12 @@
-import { signal, template, effect, $, $on, Component } from "../../../naf";
+import {
+  signal,
+  template,
+  $,
+  $on,
+  model,
+  toggleAttr,
+  Component,
+} from "../../../naf";
 import { Card } from "./Card";
 
 export function AddTodoForm(props: {
@@ -10,14 +18,9 @@ export function AddTodoForm(props: {
       root: ".add-todo-form",
       onMount(el) {
         if (!el) return;
-        const input = $<HTMLInputElement>(el, "input");
         const button = $<HTMLButtonElement>(el, "button");
 
-        if (input) input.value = props.newTodoText();
-
-        $on(el, "input", "input", (e) => {
-          props.newTodoText((e.target as HTMLInputElement).value);
-        });
+        model(el, "input", props.newTodoText, { reactive: true });
 
         $on(el, "input", "keydown", (e) => {
           if (
@@ -34,15 +37,12 @@ export function AddTodoForm(props: {
           }
         });
 
-        effect(() => {
-          if (!button) return;
-          const isEmpty = !props.newTodoText().trim();
-          if (isEmpty) {
-            button.setAttribute("disabled", "disabled");
-          } else {
-            button.removeAttribute("disabled");
-          }
-        });
+        toggleAttr(
+          button,
+          "disabled",
+          "disabled",
+          () => !props.newTodoText().trim(),
+        );
       },
     }) /*html*/ `
       <div class="add-todo-form">

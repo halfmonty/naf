@@ -541,6 +541,148 @@ export function $on<T extends Element = Element>(
   return el;
 }
 
+/**
+ * Creates two-way binding between an input element and a signal.
+ * Sets initial value, listens to input events, and optionally syncs signal changes back to input.
+ *
+ * @param root - The root element to search within
+ * @param selector - CSS selector for the input element
+ * @param sig - The signal to bind to
+ * @param options - Optional configuration
+ * @returns The input element or null if not found
+ *
+ * @example
+ * const text = signal('');
+ * model(el, 'input', text);
+ *
+ * @example
+ * // With reactive sync (updates input when signal changes externally)
+ * model(el, 'input', text, { reactive: true });
+ *
+ * @example
+ * // For checkboxes
+ * const checked = signal(false);
+ * model(el, 'input[type="checkbox"]', checked, { type: 'checkbox' });
+ */
+export function model<
+  T extends HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement,
+>(
+  root: Element,
+  selector: string,
+  sig: { (): any; (value: any): any },
+  options?: { reactive?: boolean; type?: "text" | "checkbox" | "radio" },
+): T | null {
+  const el = root.querySelector<T>(selector);
+  if (!el) return null;
+
+  const type = options?.type || "text";
+
+  // Set initial value
+  if (type === "checkbox" && el instanceof HTMLInputElement) {
+    el.checked = sig();
+  } else if ("value" in el) {
+    el.value = sig();
+  }
+
+  // Listen to changes
+  const eventType = type === "checkbox" ? "change" : "input";
+  el.addEventListener(eventType, () => {
+    if (type === "checkbox" && el instanceof HTMLInputElement) {
+      sig(el.checked);
+    } else if ("value" in el) {
+      sig(el.value);
+    }
+  });
+
+  // Optional: Keep input synced with signal changes
+  if (options?.reactive) {
+    effect(() => {
+      const value = sig();
+      if (type === "checkbox" && el instanceof HTMLInputElement) {
+        el.checked = value;
+      } else if ("value" in el && el.value !== value) {
+        el.value = value;
+      }
+    });
+  }
+
+  return el;
+}
+
+/**
+ * Reactively toggles CSS classes on an element based on a condition.
+ * Automatically adds/removes the class when the condition changes.
+ *
+ * @param el - The element to toggle classes on
+ * @param className - The CSS class name to toggle
+ * @param condition - A function that returns true to add the class, false to remove it
+ * @returns Cleanup function to stop the effect
+ *
+ * @example
+ * const isActive = signal(false);
+ * toggleClass(button, 'active', () => isActive());
+ *
+ * @example
+ * // Multiple classes
+ * toggleClass(el, 'disabled', () => !isValid());
+ * toggleClass(el, 'loading', () => isPending());
+ */
+export function toggleClass(
+  el: Element | null | undefined,
+  className: string,
+  condition: () => boolean,
+): () => void {
+  if (!el) return () => {};
+
+  return effect(() => {
+    if (condition()) {
+      el.classList.add(className);
+    } else {
+      el.classList.remove(className);
+    }
+  });
+}
+
+/**
+ * Reactively toggles an HTML attribute on an element based on a condition.
+ * Automatically adds/removes the attribute when the condition changes.
+ *
+ * @param el - The element to toggle attributes on
+ * @param attr - The attribute name to toggle
+ * @param value - The value to set when condition is true (defaults to empty string for boolean attrs)
+ * @param condition - A function that returns true to add the attribute, false to remove it
+ * @returns Cleanup function to stop the effect
+ *
+ * @example
+ * const isDisabled = signal(false);
+ * toggleAttr(button, 'disabled', 'disabled', () => isDisabled());
+ *
+ * @example
+ * // Boolean attribute (no value)
+ * toggleAttr(input, 'required', '', () => isRequired());
+ *
+ * @example
+ * // With dynamic value
+ * const role = signal('button');
+ * toggleAttr(el, 'aria-label', 'Click me', () => role() === 'button');
+ */
+export function toggleAttr(
+  el: Element | null | undefined,
+  attr: string,
+  value: string,
+  condition: () => boolean,
+): () => void {
+  if (!el) return () => {};
+
+  return effect(() => {
+    if (condition()) {
+      el.setAttribute(attr, value);
+    } else {
+      el.removeAttribute(attr);
+    }
+  });
+}
+
 // ============================================================================
 // ROUTER
 // ============================================================================
