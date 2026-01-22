@@ -1,4 +1,4 @@
-import { signal, template, effect, Component } from "../../../naf";
+import { signal, template, effect, $, $on, Component } from "../../../naf";
 import { Card } from "./Card";
 
 export function AddTodoForm(props: {
@@ -10,27 +10,32 @@ export function AddTodoForm(props: {
       root: ".add-todo-form",
       onMount(el) {
         if (!el) return;
-        const input = el.querySelector("input") as HTMLInputElement;
-        const button = el.querySelector("button") as HTMLButtonElement;
+        const input = $<HTMLInputElement>(el, "input");
+        const button = $<HTMLButtonElement>(el, "button");
 
-        input.value = props.newTodoText();
-        input.addEventListener("input", (e) => {
+        if (input) input.value = props.newTodoText();
+
+        $on(el, "input", "input", (e) => {
           props.newTodoText((e.target as HTMLInputElement).value);
         });
 
-        input.addEventListener("keydown", (e) => {
-          if (e.key === "Enter" && props.newTodoText().trim()) {
+        $on(el, "input", "keydown", (e) => {
+          if (
+            (e as KeyboardEvent).key === "Enter" &&
+            props.newTodoText().trim()
+          ) {
             props.onAdd();
           }
         });
 
-        button.addEventListener("click", () => {
+        $on(el, "button", "click", () => {
           if (props.newTodoText().trim()) {
             props.onAdd();
           }
         });
 
         effect(() => {
+          if (!button) return;
           const isEmpty = !props.newTodoText().trim();
           if (isEmpty) {
             button.setAttribute("disabled", "disabled");

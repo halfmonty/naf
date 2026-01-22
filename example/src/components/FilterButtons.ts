@@ -1,4 +1,4 @@
-import { signal, template, effect, Component } from "../../../naf";
+import { signal, template, effect, $$, Component } from "../../../naf";
 import { Filter } from "./types";
 import { Card } from "./Card";
 
@@ -10,7 +10,7 @@ export function FilterButtons(props: {
       root: ".filters",
       onMount(el) {
         if (!el) return;
-        const buttons = el.querySelectorAll("button");
+        const buttons = $$(el, "button");
 
         buttons.forEach((btn) => {
           btn.addEventListener("click", () => {

@@ -13,7 +13,7 @@
     "type-check": "tsc --noEmit",
     "build": "esbuild naf.ts --bundle --minify --format=esm --outfile=dist/naf.min.js",
     "compress": "npm run build && gzip -k -f dist/naf.min.js && brotli -k -f dist/naf.min.js",
-    "size": "npm run compress && ls -lh dist/naf.min.js*"
+    "size": "npm run compress && ls -lh dist/*.min.js*"
   },
   "keywords": [
     "framework",

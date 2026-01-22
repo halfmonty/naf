@@ -1,4 +1,4 @@
-import { template, text, Component } from "../../../naf";
+import { template, text, $on, Component } from "../../../naf";
 import { Todo } from "./types";
 
 export function TodoItem(props: {
@@ -10,13 +10,11 @@ export function TodoItem(props: {
     root: `[data-id="${props.todo.id}"]`,
     onMount(el) {
       if (!el) return;
-      const checkbox = el.querySelector(
-        'input[type="checkbox"]',
-      ) as HTMLInputElement;
-      const deleteBtn = el.querySelector(".delete-btn") as HTMLButtonElement;
 
-      checkbox.addEventListener("change", () => props.onToggle(props.todo.id));
-      deleteBtn.addEventListener("click", () => props.onDelete(props.todo.id));
+      $on(el, 'input[type="checkbox"]', "change", () =>
+        props.onToggle(props.todo.id),
+      );
+      $on(el, ".delete-btn", "click", () => props.onDelete(props.todo.id));
     },
   }) /*html*/ `
     <div class="todo-item ${props.todo.done ? "done" : ""}" data-id="${props.todo.id}">
