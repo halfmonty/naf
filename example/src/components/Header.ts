@@ -1,7 +1,5 @@
-import { template, Component } from "../../../naf";
-
-export function Header(): Component {
-  return template /*html*/ `
+export function Header(): string {
+  return /*html*/ `
     <h1>Todo App</h1>
   `;
 }

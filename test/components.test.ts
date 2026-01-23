@@ -5,8 +5,6 @@ import {
   template,
   when,
   each,
-  bind,
-  bindAttr,
   text,
   Component,
 } from "../naf";
@@ -156,8 +154,8 @@ describe("Component System", () => {
   describe("when", () => {
     it("should render then branch when condition is true", () => {
       const condition = signal(true);
-      const thenComp = () => template`<div>Then</div>`;
-      const elseComp = () => template`<div>Else</div>`;
+      const thenComp = (value: boolean) => template`<div>Then</div>`;
+      const elseComp = (value: boolean) => template`<div>Else</div>`;
 
       const comp = when(condition, thenComp, elseComp);
       comp.mount(container);
@@ -167,8 +165,8 @@ describe("Component System", () => {
 
     it("should render else branch when condition is false", () => {
       const condition = signal(false);
-      const thenComp = () => template`<div>Then</div>`;
-      const elseComp = () => template`<div>Else</div>`;
+      const thenComp = (value: boolean) => template`<div>Then</div>`;
+      const elseComp = (value: boolean) => template`<div>Else</div>`;
 
       const comp = when(condition, thenComp, elseComp);
       comp.mount(container);
@@ -178,8 +176,8 @@ describe("Component System", () => {
 
     it("should reactively switch branches", () => {
       const condition = signal(true);
-      const thenComp = () => template`<div>Then</div>`;
-      const elseComp = () => template`<div>Else</div>`;
+      const thenComp = (value: boolean) => template`<div>Then</div>`;
+      const elseComp = (value: boolean) => template`<div>Else</div>`;
 
       const comp = when(condition, thenComp, elseComp);
       comp.mount(container);
@@ -195,7 +193,7 @@ describe("Component System", () => {
 
     it("should work without else branch", () => {
       const condition = signal(true);
-      const thenComp = () => template`<div>Then</div>`;
+      const thenComp = (value: boolean) => template`<div>Then</div>`;
 
       const comp = when(condition, thenComp);
       comp.mount(container);
@@ -211,12 +209,12 @@ describe("Component System", () => {
       const thenUnmount = vi.fn();
       const elseUnmount = vi.fn();
 
-      const thenComp = () =>
+      const thenComp = (value: boolean) =>
         template({
           onUnmount: thenUnmount,
         })`<div>Then</div>`;
 
-      const elseComp = () =>
+      const elseComp = (value: boolean) =>
         template({
           onUnmount: elseUnmount,
         })`<div>Else</div>`;
@@ -236,7 +234,7 @@ describe("Component System", () => {
 
     it("should cleanup on unmount", () => {
       const condition = signal(true);
-      const thenComp = () => template`<div>Then</div>`;
+      const thenComp = (value: boolean) => template`<div>Then</div>`;
 
       const comp = when(condition, thenComp);
       comp.mount(container);
@@ -246,6 +244,40 @@ describe("Component System", () => {
       const initialHTML = container.innerHTML;
       condition(false);
       expect(container.innerHTML).toBe(initialHTML);
+    });
+
+    it("should pass condition value to callbacks to avoid double computation", () => {
+      let computeCount = 0;
+      const data = signal([1, 2, 3]);
+
+      // Track how many times the condition is computed
+      const condition = computed(() => {
+        computeCount++;
+        return data();
+      });
+
+      const thenComp = (value: number[]) => {
+        // Use the passed value instead of calling condition() again
+        return template`<div>${value.length} items</div>`;
+      };
+
+      const elseComp = (value: number[]) => {
+        return template`<div>Empty</div>`;
+      };
+
+      const comp = when(condition, thenComp, elseComp);
+      comp.mount(container);
+
+      // Should only compute once per effect run
+      const initialComputeCount = computeCount;
+      expect(container.textContent).toContain("3 items");
+
+      // Change data to trigger re-render
+      data([1, 2, 3, 4]);
+
+      // Verify computation happened exactly once more (not twice)
+      expect(computeCount).toBe(initialComputeCount + 1);
+      expect(container.textContent).toContain("4 items");
     });
   });
 
@@ -361,160 +393,6 @@ describe("Component System", () => {
     });
   });
 
-  describe("bind", () => {
-    it("should bind property reactively", () => {
-      const count = signal(5);
-      const div = document.createElement("div");
-
-      const cleanup = bind(div, "textContent", () => String(count()));
-
-      expect(div.textContent).toBe("5");
-
-      count(10);
-      expect(div.textContent).toBe("10");
-
-      cleanup();
-    });
-
-    it("should bind computed values", () => {
-      const count = signal(5);
-      const doubled = computed(() => count() * 2);
-      const div = document.createElement("div");
-
-      const cleanup = bind(div, "textContent", () => String(doubled()));
-
-      expect(div.textContent).toBe("10");
-
-      count(20);
-      expect(div.textContent).toBe("40");
-
-      cleanup();
-    });
-
-    it("should bind with getter function", () => {
-      const firstName = signal("John");
-      const lastName = signal("Doe");
-      const div = document.createElement("div");
-
-      const cleanup = bind(
-        div,
-        "textContent",
-        () => `${firstName()} ${lastName()}`,
-      );
-
-      expect(div.textContent).toBe("John Doe");
-
-      firstName("Jane");
-      expect(div.textContent).toBe("Jane Doe");
-
-      cleanup();
-    });
-
-    it("should stop updating after cleanup", () => {
-      const count = signal(5);
-      const div = document.createElement("div");
-
-      const cleanup = bind(div, "textContent", () => String(count()));
-      expect(div.textContent).toBe("5");
-
-      cleanup();
-
-      count(10);
-      expect(div.textContent).toBe("5"); // Should not update
-    });
-
-    it("should work with different properties", () => {
-      const value = signal("test-class");
-      const div = document.createElement("div");
-
-      const cleanup = bind(div, "className", value);
-      expect(div.className).toBe("test-class");
-
-      value("another-class");
-      expect(div.className).toBe("another-class");
-
-      cleanup();
-    });
-  });
-
-  describe("bindAttr", () => {
-    it("should bind attribute reactively", () => {
-      const disabled = signal(true);
-      const button = document.createElement("button");
-
-      const cleanup = bindAttr(button, "disabled", () =>
-        disabled() ? "disabled" : null,
-      );
-
-      expect(button.hasAttribute("disabled")).toBe(true);
-
-      disabled(false);
-      expect(button.hasAttribute("disabled")).toBe(false);
-
-      cleanup();
-    });
-
-    it("should remove attribute when value is null", () => {
-      const title = signal<string | null>("Hello");
-      const div = document.createElement("div");
-
-      const cleanup = bindAttr(div, "title", () => title());
-
-      expect(div.getAttribute("title")).toBe("Hello");
-
-      title(null);
-      expect(div.hasAttribute("title")).toBe(false);
-
-      title("World");
-      expect(div.getAttribute("title")).toBe("World");
-
-      cleanup();
-    });
-
-    it("should handle class attribute", () => {
-      const active = signal(true);
-      const div = document.createElement("div");
-
-      const cleanup = bindAttr(div, "class", () =>
-        active() ? "active" : "inactive",
-      );
-
-      expect(div.getAttribute("class")).toBe("active");
-
-      active(false);
-      expect(div.getAttribute("class")).toBe("inactive");
-
-      cleanup();
-    });
-
-    it("should stop updating after cleanup", () => {
-      const title = signal("Initial");
-      const div = document.createElement("div");
-
-      const cleanup = bindAttr(div, "title", () => title());
-      expect(div.getAttribute("title")).toBe("Initial");
-
-      cleanup();
-
-      title("Updated");
-      expect(div.getAttribute("title")).toBe("Initial"); // Should not update
-    });
-
-    it("should work with data attributes", () => {
-      const id = signal("123");
-      const div = document.createElement("div");
-
-      const cleanup = bindAttr(div, "data-id", () => id());
-
-      expect(div.getAttribute("data-id")).toBe("123");
-
-      id("456");
-      expect(div.getAttribute("data-id")).toBe("456");
-
-      cleanup();
-    });
-  });
-
   describe("Component Integration", () => {
     it("should compose multiple features", () => {
       const count = signal(0);
@@ -525,7 +403,11 @@ describe("Component System", () => {
 
       const comp = template`
         <div>
-          ${when(showCount, counterDisplay, emptyMessage)}
+          ${when(
+            showCount,
+            (v) => counterDisplay(),
+            (v) => emptyMessage(),
+          )}
           <button>+</button>
         </div>
       `;
@@ -544,10 +426,10 @@ describe("Component System", () => {
       const items = signal([1, 2, 3]);
       const showItems = signal(true);
 
-      const itemList = () =>
+      const itemList = (value: boolean) =>
         each(items, (item) => template`<div>Item ${item}</div>`);
 
-      const empty = () => template`<div>No items</div>`;
+      const empty = (value: boolean) => template`<div>No items</div>`;
 
       const comp = when(showItems, itemList, empty);
       comp.mount(container);

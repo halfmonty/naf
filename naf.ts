@@ -39,8 +39,42 @@ interface TemplateOptions<T extends Element = Element> {
   onUnmount?: () => void;
 }
 
+/**
+ * Options for template function WITH root selector - guarantees el is non-null.
+ *
+ * @template T - The type of the root element
+ */
+interface TemplateOptionsWithRoot<T extends Element = Element> {
+  /** CSS selector for the root element to capture in el property */
+  root: string;
+  /** Called after component is mounted - el is guaranteed to exist */
+  onMount?: (el: T, parent: Element) => void;
+  /** Called before component is unmounted */
+  onUnmount?: () => void;
+}
+
 /** Valid values that can be interpolated in templates */
 type TemplateValue = Component | string | number | boolean | null | undefined;
+
+/**
+ * Signal type - a reactive getter/setter function.
+ * Use this type for function parameters and props instead of verbose function signatures.
+ *
+ * @example
+ * // Instead of: props: { count: () => number }
+ * // Use: props: { count: Signal<number> }
+ */
+export type Signal<T> = { (): T; (value: T): T };
+
+/**
+ * Computed type - a reactive getter-only function.
+ * Use this type for computed values in function parameters and props.
+ *
+ * @example
+ * // Instead of: props: { doubled: () => number }
+ * // Use: props: { doubled: Computed<number> }
+ */
+export type Computed<T> = () => T;
 
 // ============================================================================
 // REACTIVITY SYSTEM
@@ -77,7 +111,7 @@ const notify = (subs: Subs) => [...subs].forEach((fn) => fn());
  * count(5);             // Set value
  * console.log(count()); // 5
  */
-export function signal<T>(initialValue: T): { (): T; (value: T): T } {
+export function signal<T>(initialValue: T): Signal<T> {
   let value = initialValue;
   const subs: Subs = new Set();
 
@@ -109,7 +143,7 @@ export function signal<T>(initialValue: T): { (): T; (value: T): T } {
  * count(10);
  * console.log(doubled()); // 20
  */
-export function computed<T>(fn: () => T): () => T {
+export function computed<T>(fn: () => T): Computed<T> {
   let value: T;
   let dirty = true;
   const subs: Subs = new Set();
@@ -223,6 +257,9 @@ function buildTemplate(
     if (isComponent(value)) {
       components.push(value);
       parts.push(value.html);
+    } else if (typeof value === "string") {
+      // Plain strings are treated as raw HTML without component wrapper
+      parts.push(value);
     } else if (value != null && value !== false) {
       parts.push(String(value));
     }
@@ -247,9 +284,13 @@ function createComponent<T extends Element>(
       }
       for (const c of components) c.mount(parent);
       if (options?.root) {
-        component.el = parent.querySelector<T>(options.root) ?? undefined;
+        const foundEl = parent.querySelector<T>(options.root);
+        if (!foundEl) {
+          throw new Error(`Element not found for selector: ${options.root}`);
+        }
+        component.el = foundEl;
       }
-      options?.onMount?.(component.el, parent);
+      options?.onMount?.(component.el as T, parent);
     },
     unmount() {
       for (const c of components) c.unmount?.();
@@ -262,27 +303,80 @@ function createComponent<T extends Element>(
 /** Counter for generating unique slot IDs */
 let slotId = 0;
 
+/** Reusable temporary element for parsing HTML strings */
+const tempDiv = document.createElement("div");
+
+/**
+ * Updates content between comment markers in a reactive slot.
+ * Removes old content and inserts new HTML between start and end markers.
+ */
+function updateSlotContent(
+  placeholder: Comment,
+  commentId: string,
+  html: string,
+): void {
+  const parent = placeholder.parentNode!;
+
+  // Find end marker
+  let node = placeholder.nextSibling;
+  while (node && node.textContent !== `/naf-${commentId}`) {
+    node = node.nextSibling;
+  }
+  const end = node;
+
+  // Remove old content (everything between markers)
+  node = placeholder.nextSibling;
+  while (node && node !== end) {
+    const next = node.nextSibling;
+    parent.removeChild(node);
+    node = next;
+  }
+
+  // Insert new content
+  if (html) {
+    tempDiv.innerHTML = html;
+    while (tempDiv.firstChild) {
+      parent.insertBefore(tempDiv.firstChild, end);
+    }
+  }
+}
+
 /** Creates a reactive slot placeholder for dynamic content (used by when/each) */
 function reactiveSlot(
   dataAttr: string,
-  setupEffect: (placeholder: Element) => () => void,
+  setupEffect: (placeholder: Comment) => () => void,
 ): Component {
-  const id = `naf-${slotId++}`;
+  const id = slotId++;
   let cleanup: (() => void) | undefined;
-  const html = `<span data-${dataAttr}="${id}"></span>`;
+  const html = `<!--naf-${id}--><!--/naf-${id}-->`;
 
   return {
     html,
     mount(parent: Element) {
-      let placeholder = parent.querySelector(`[data-${dataAttr}="${id}"]`);
-      if (!placeholder) {
+      // Ensure HTML is in DOM first
+      if (!parent.innerHTML) {
         parent.innerHTML = html;
-        placeholder = parent.querySelector(`[data-${dataAttr}="${id}"]`);
-        if (!placeholder) {
-          throw new Error(
-            `Could not find placeholder data-${dataAttr}="${id}"`,
-          );
+      }
+
+      // Find comment node with matching id
+      const walker = document.createTreeWalker(
+        parent,
+        NodeFilter.SHOW_COMMENT,
+        null,
+      );
+      let placeholder: Comment | null = null;
+      let endMarker: Comment | null = null;
+      let node: Node | null;
+      while ((node = walker.nextNode())) {
+        if (node.textContent === `naf-${id}`) {
+          placeholder = node as Comment;
+        } else if (node.textContent === `/naf-${id}`) {
+          endMarker = node as Comment;
+          break;
         }
+      }
+      if (!placeholder || !endMarker) {
+        throw new Error(`Could not find placeholder comments: naf-${id}`);
       }
       cleanup = setupEffect(placeholder);
     },
@@ -320,6 +414,9 @@ function reactiveSlot(
  * }
  */
 export function template<T extends Element = Element>(
+  options: TemplateOptionsWithRoot<T>,
+): (strings: TemplateStringsArray, ...values: TemplateValue[]) => Component<T>;
+export function template<T extends Element = Element>(
   options: TemplateOptions<T>,
 ): (strings: TemplateStringsArray, ...values: TemplateValue[]) => Component<T>;
 export function template(
@@ -356,8 +453,9 @@ export function template<T extends Element = Element>(
 /**
  * Conditional rendering based on a reactive condition.
  *
- * Efficiently renders different components based on a boolean.
+ * Efficiently renders different components based on a truthy/falsy value.
  * Automatically unmounts the previous component before mounting the new one.
+ * Passes the condition result to callbacks to avoid double computation.
  *
  * @example
  * const isLoggedIn = signal(false);
@@ -370,20 +468,37 @@ export function template<T extends Element = Element>(
  *     )}
  *   </div>
  * `;
+ *
+ * @example
+ * // Avoid double computation by using the passed value
+ * const filteredTodos = computed(() => todos().filter(t => !t.done));
+ * template`
+ *   ${when(
+ *     () => filteredTodos(),
+ *     (todos) => TodoList({ todos }),  // Uses passed value, no re-computation
+ *     () => template`<p>No todos</p>`
+ *   )}
+ * `;
  */
-export function when(
-  condition: () => boolean,
-  then: () => Component,
-  otherwise?: () => Component,
+export function when<T>(
+  condition: () => T,
+  then: (value: T) => Component,
+  otherwise?: (value: T) => Component,
 ): Component {
   let currentComponent: Component | undefined;
 
   return reactiveSlot("when", (placeholder) => {
+    // Capture id from comment node
+    const commentId = placeholder.textContent?.replace("naf-", "") || "0";
+
     const stopEffect = effect(() => {
       currentComponent?.unmount?.();
-      currentComponent = condition() ? then() : otherwise?.();
-      placeholder.innerHTML = currentComponent?.html ?? "";
-      currentComponent?.mount(placeholder);
+      const value = condition();
+      currentComponent = value ? then(value) : otherwise?.(value);
+
+      const html = currentComponent?.html ?? "";
+      updateSlotContent(placeholder, commentId, html);
+      currentComponent?.mount(placeholder.parentNode as Element);
     });
 
     return () => {
@@ -420,6 +535,9 @@ export function each<T>(
   let components: Component[] = [];
 
   return reactiveSlot("each", (placeholder) => {
+    // Capture id from comment node
+    const commentId = placeholder.textContent?.replace("naf-", "") || "0";
+
     const stopEffect = effect(() => {
       components.forEach((c) => c.unmount?.());
       components = [];
@@ -433,8 +551,8 @@ export function each<T>(
         })
         .join("");
 
-      placeholder.innerHTML = html;
-      components.forEach((c) => c.mount(placeholder));
+      updateSlotContent(placeholder, commentId, html);
+      components.forEach((c) => c.mount(placeholder.parentNode as Element));
     });
 
     return () => {
@@ -445,43 +563,49 @@ export function each<T>(
 }
 
 /**
- * Binds a reactive value to an element property.
+ * Reactively binds a value to an element attribute.
+ * Handles boolean attributes, string values, and removal.
+ *
+ * Value handling:
+ * - `true`: Sets attribute with empty string (boolean attribute)
+ * - `false` or `null`: Removes the attribute
+ * - string: Sets attribute with that value
+ *
+ * @param el - The element to update
+ * @param name - The attribute name
+ * @param value - A function that returns the attribute value
+ * @returns Cleanup function to stop the effect
  *
  * @example
- * const count = signal(0);
- * const display = document.querySelector('#display');
- * bind(display, 'textContent', () => `Count: ${count()}`);
- */
-export function bind<K extends keyof HTMLElement>(
-  el: HTMLElement,
-  prop: K,
-  getter: () => HTMLElement[K],
-): () => void {
-  return effect(() => {
-    el[prop] = getter();
-  });
-}
-
-/**
- * Binds a reactive value to an element attribute.
- * Setting value to null removes the attribute.
- *
- * @example
+ * // Boolean attribute (disabled)
  * const isDisabled = signal(false);
- * const button = document.querySelector('button');
- * bindAttr(button, 'disabled', () => isDisabled() ? 'disabled' : null);
+ * attr(button, 'disabled', () => isDisabled());
+ *
+ * @example
+ * // String attribute
+ * const label = signal('Click me');
+ * attr(button, 'aria-label', () => label());
+ *
+ * @example
+ * // Conditional attribute
+ * attr(button, 'disabled', () => !isValid());
+ * attr(input, 'required', () => isRequired());
  */
-export function bindAttr(
-  el: Element,
-  attr: string,
-  getter: () => string | null,
+export function attr(
+  el: Element | null | undefined,
+  name: string,
+  value: () => string | boolean | null,
 ): () => void {
+  if (!el) return () => {};
+
   return effect(() => {
-    const value = getter();
-    if (value === null) {
-      el.removeAttribute(attr);
+    const v = value();
+    if (v === false || v === null) {
+      el.removeAttribute(name);
+    } else if (v === true) {
+      el.setAttribute(name, "");
     } else {
-      el.setAttribute(attr, value);
+      el.setAttribute(name, String(v));
     }
   });
 }
@@ -504,16 +628,18 @@ export function $<T extends Element = Element>(
 }
 
 /**
- * Short alias for querySelectorAll.
+ * Short alias for querySelectorAll that returns an array.
+ * Enables use of array methods like map, filter, find, etc.
  *
  * @example
  * const buttons = $$(el, 'button');
+ * buttons.map(btn => btn.textContent);
  */
 export function $$<T extends Element = Element>(
   root: Element | Document,
   selector: string,
-): NodeListOf<T> {
-  return root.querySelectorAll<T>(selector);
+): T[] {
+  return Array.from(root.querySelectorAll<T>(selector));
 }
 
 /**
@@ -644,42 +770,44 @@ export function toggleClass(
 }
 
 /**
- * Reactively toggles an HTML attribute on an element based on a condition.
- * Automatically adds/removes the attribute when the condition changes.
- *
- * @param el - The element to toggle attributes on
- * @param attr - The attribute name to toggle
- * @param value - The value to set when condition is true (defaults to empty string for boolean attrs)
- * @param condition - A function that returns true to add the attribute, false to remove it
- * @returns Cleanup function to stop the effect
- *
+ * @deprecated Use `attr()` instead. This will be removed in a future version.
  * @example
- * const isDisabled = signal(false);
- * toggleAttr(button, 'disabled', 'disabled', () => isDisabled());
- *
- * @example
- * // Boolean attribute (no value)
- * toggleAttr(input, 'required', '', () => isRequired());
- *
- * @example
- * // With dynamic value
- * const role = signal('button');
- * toggleAttr(el, 'aria-label', 'Click me', () => role() === 'button');
+ * // Old: toggleAttr(button, 'disabled', 'disabled', () => isDisabled())
+ * // New: attr(button, 'disabled', () => isDisabled())
  */
 export function toggleAttr(
   el: Element | null | undefined,
-  attr: string,
+  attrName: string,
   value: string,
   condition: () => boolean,
+): () => void {
+  return attr(el, attrName, () => (condition() ? value || true : false));
+}
+
+/**
+ * Reactively binds a value to an element's textContent.
+ * Automatically updates the text when the getter returns a new value.
+ *
+ * @param el - The element to update
+ * @param getter - A function that returns the text value
+ * @returns Cleanup function to stop the effect
+ *
+ * @example
+ * const count = signal(0);
+ * setText(counterEl, () => count());
+ *
+ * @example
+ * const name = signal('World');
+ * setText(greetingEl, () => `Hello, ${name()}!`);
+ */
+export function setText(
+  el: Element | null | undefined,
+  getter: () => any,
 ): () => void {
   if (!el) return () => {};
 
   return effect(() => {
-    if (condition()) {
-      el.setAttribute(attr, value);
-    } else {
-      el.removeAttribute(attr);
-    }
+    el.textContent = String(getter());
   });
 }
 

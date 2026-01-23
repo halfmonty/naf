@@ -1,23 +1,14 @@
-import {
-  signal,
-  template,
-  $,
-  $on,
-  model,
-  toggleAttr,
-  Component,
-} from "../../../naf";
+import { Signal, template, $, $on, model, attr, Component } from "../../../naf";
 import { Card } from "./Card";
 
 export function AddTodoForm(props: {
-  newTodoText: ReturnType<typeof signal<string>>;
+  newTodoText: Signal<string>;
   onAdd: () => void;
 }): Component {
   return Card({
     children: template({
       root: ".add-todo-form",
       onMount(el) {
-        if (!el) return;
         const button = $<HTMLButtonElement>(el, "button");
 
         model(el, "input", props.newTodoText, { reactive: true });
@@ -37,12 +28,7 @@ export function AddTodoForm(props: {
           }
         });
 
-        toggleAttr(
-          button,
-          "disabled",
-          "disabled",
-          () => !props.newTodoText().trim(),
-        );
+        attr(button, "disabled", () => !props.newTodoText().trim());
       },
     }) /*html*/ `
       <div class="add-todo-form">

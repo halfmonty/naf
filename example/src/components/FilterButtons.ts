@@ -1,15 +1,14 @@
-import { signal, template, $$, toggleClass, Component } from "../../../naf";
+import { Signal, template, $$, toggleClass, Component } from "../../../naf";
 import { Filter } from "./types";
 import { Card } from "./Card";
 
 export function FilterButtons(props: {
-  currentFilter: ReturnType<typeof signal<Filter>>;
+  currentFilter: Signal<Filter>;
 }): Component {
   return Card({
     children: template({
       root: ".filters",
       onMount(el) {
-        if (!el) return;
         const buttons = $$(el, "button");
 
         buttons.forEach((btn) => {

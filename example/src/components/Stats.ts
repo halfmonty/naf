@@ -1,32 +1,25 @@
-import { template, effect, $, Component } from "../../../naf";
+import { Computed, template, $, setText, Component } from "../../../naf";
 import { Card } from "./Card";
 
 export function Stats(props: {
-  activeCount: () => number;
-  totalCount: () => number;
+  activeCount: Computed<number>;
+  totalCount: Computed<number>;
 }): Component {
   return Card({
     className: "stats",
     children: template({
       root: ".stats-content",
       onMount(el) {
-        if (!el) return;
         const activeEl = $<HTMLElement>(el, ".stat:first-child strong");
         const activeLabel = $<HTMLElement>(el, ".stat:first-child span");
         const totalEl = $<HTMLElement>(el, ".stat:last-child strong");
 
-        effect(() => {
-          if (!activeEl || !activeLabel) return;
+        setText(activeEl, props.activeCount);
+        setText(activeLabel, () => {
           const active = props.activeCount();
-          activeEl.textContent = String(active);
-          activeLabel.textContent =
-            active === 1 ? "task remaining" : "tasks remaining";
+          return active === 1 ? "task remaining" : "tasks remaining";
         });
-
-        effect(() => {
-          if (!totalEl) return;
-          totalEl.textContent = String(props.totalCount());
-        });
+        setText(totalEl, props.totalCount);
       },
     }) /*html*/ `
       <div class="stats-content">

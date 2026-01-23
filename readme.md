@@ -2,9 +2,9 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
-[![Bundle Size](https://img.shields.io/badge/bundle%20size-~1.6KB-success)](https://github.com/yourusername/naf)
+[![Bundle Size](https://img.shields.io/badge/bundle%20size-~1.3KB-success)](https://github.com/yourusername/naf)
 
-A ~1.6KB gzipped reactive functions library for building SPAs with zero dependencies.
+A ~1.3KB gzipped reactive framework for building SPAs with zero dependencies.
 
 ## ⚡ Quick Install
 
@@ -102,7 +102,7 @@ The functions library includes a fine-grained reactivity system based on [alien-
 - **`effect(fn)`** - Runs side effects when dependencies change
 
 ```typescript
-import { signal, computed, effect } from './util';
+import { signal, computed, effect } from './naf';
 
 const count = signal(0);
 const doubled = computed(() => count() * 2);
@@ -119,6 +119,26 @@ count(5);  // Logs: "Count is 5, doubled is 10"
 - Computed values are cached and only re-compute when dependencies change
 - Effects automatically track which signals they depend on
 - Effects return a cleanup function to stop tracking
+
+**Type Annotations:**
+
+NAF exports `Signal<T>` and `Computed<T>` types for cleaner type annotations:
+
+```typescript
+import { Signal, Computed } from './naf';
+
+// Instead of verbose function types
+function MyComponent(props: {
+  count: () => number;
+  doubled: () => number;
+}) { ... }
+
+// Use clean type aliases
+function MyComponent(props: {
+  count: Signal<number>;      // Reactive getter/setter
+  doubled: Computed<number>;  // Reactive getter-only
+}) { ... }
+```
 
 ## Features
 
@@ -183,12 +203,10 @@ let stopEffect: (() => void) | undefined;
 return template({
   root: '#about',
   onMount: (el, parent) => {
-    // el is the element matched by root selector
+    // When root is provided, el is guaranteed to exist (non-null)
     // parent is the container passed to mount()
     stopEffect = effect(() => {
-      if (el) {
-        el.textContent = `Count: ${count()}`;
-      }
+      el.textContent = `Count: ${count()}`;
     });
   },
   onUnmount: () => {
@@ -199,9 +217,11 @@ return template({
 `;
 ```
 
+**Note:** When a `root` selector is provided, `el` is guaranteed to be non-null in `onMount`. If the element is not found, an error is thrown. Without `root`, `el` will be `undefined`.
+
 ### `when` - Conditional Rendering
 
-Reactively render different components based on a condition:
+Reactively render different components based on a condition. The condition result is passed to callbacks to avoid double computation:
 
 ```typescript
 function LoginPage(): Component {
@@ -211,13 +231,13 @@ function LoginPage(): Component {
     <div>
       ${when(
         () => isLoggedIn(),
-        () => template`
+        (value) => template`
           <div>
             <p>Welcome back!</p>
             <button onclick="${() => isLoggedIn(false)}">Logout</button>
           </div>
         `,
-        () => template`
+        (value) => template`
           <div>
             <p>Please log in</p>
             <button onclick="${() => isLoggedIn(true)}">Login</button>
@@ -229,20 +249,41 @@ function LoginPage(): Component {
 }
 ```
 
+**Avoiding Double Computation:**
+
+The condition result is passed to callbacks, preventing redundant calculations:
+
+```typescript
+// ❌ Bad: filteredTodos() computed twice
+when(
+  () => filteredTodos().length > 0,
+  () => TodoList({ todos: filteredTodos() }),  // Computes again!
+)
+
+// ✅ Good: condition result is passed to callback
+when(
+  () => filteredTodos(),
+  (todos) => TodoList({ todos }),  // Uses passed value
+  () => template`<p>No todos</p>`
+)
+```
+
 **Signature:**
 ```typescript
-function when(
-  condition: () => boolean,
-  then: () => Component,
-  otherwise?: () => Component
+function when<T>(
+  condition: () => T,
+  then: (value: T) => Component,
+  otherwise?: (value: T) => Component
 ): Component
 ```
 
 **How it works:**
 - Creates a reactive effect that tracks the condition
+- Passes the condition result to `then` or `otherwise` callbacks
 - When condition changes, unmounts old component and mounts new one
 - The `otherwise` parameter is optional
 - Automatically cleans up effects on unmount
+- Uses truthiness to determine which branch to take
 
 ### `each` - List Rendering
 
@@ -309,84 +350,132 @@ function each<T>(
 - All previous components are unmounted before new ones are created
 - For best performance, keep item counts under ~100
 
-### `bind` - Property Binding
+### `attr` - Attribute Binding
 
-Bind a reactive signal to a DOM element property:
+Reactively binds a value to an element attribute. Handles boolean attributes, string values, and removal.
+
+```typescript
+function Form(): Component {
+  const isDisabled = signal(false);
+  const label = signal('Click me');
+
+  return template({
+    root: 'button',
+    onMount: (el) => {
+      if (el) {
+        attr(el, 'disabled', () => isDisabled());
+        attr(el, 'aria-label', () => label());
+      }
+    }
+  })`<button>Submit</button>`;
+}
+```
+
+**Signature:**
+```typescript
+function attr(
+  el: Element | null | undefined,
+  name: string,
+  value: () => string | boolean | null
+): () => void
+```
+
+**Returns:** A cleanup function to stop the effect
+
+**Value handling:**
+- `true`: Sets attribute with empty string (boolean attribute)
+- `false` or `null`: Removes the attribute
+- string: Sets attribute with that value
+
+**Examples:**
+```typescript
+// Boolean attribute (disabled)
+const isDisabled = signal(false);
+attr(button, 'disabled', () => isDisabled());
+
+// String attribute
+const label = signal('Click me');
+attr(button, 'aria-label', () => label());
+
+// Conditional attribute
+attr(button, 'disabled', () => !isValid());
+attr(input, 'required', () => isRequired());
+```
+
+### `toggleClass` - CSS Class Toggling
+
+Reactively toggles CSS classes on an element based on a condition:
+
+```typescript
+function Button(): Component {
+  const isActive = signal(false);
+  const isLoading = signal(false);
+
+  return template({
+    root: 'button',
+    onMount: (el) => {
+      if (el) {
+        toggleClass(el, 'active', () => isActive());
+        toggleClass(el, 'loading', () => isLoading());
+      }
+    }
+  })`<button>Click me</button>`;
+}
+```
+
+**Signature:**
+```typescript
+function toggleClass(
+  el: Element | null | undefined,
+  className: string,
+  condition: () => boolean
+): () => void
+```
+
+**Returns:** A cleanup function to stop the effect
+
+### `setText` - Reactive Text Content
+
+Reactively binds a value to an element's textContent:
 
 ```typescript
 function Counter(): Component {
   const count = signal(0);
 
-  const view = template({ root: '#display' })`
+  return template({
+    root: '#count',
+    onMount: (el) => {
+      if (el) {
+        setText(el, () => count());
+      }
+    }
+  })`
     <div>
-      <div id="display"></div>
-      <button onclick="${() => count(count() + 1)}">Increment</button>
+      <span id="count"></span>
+      <button onclick="${() => count(count() + 1)}">+</button>
     </div>
   `;
-
-  let cleanup: (() => void) | undefined;
-
-  return template({
-    onMount: (_, parent) => {
-      const displayEl = parent.querySelector('#display') as HTMLElement;
-      cleanup = bind(displayEl, 'textContent', () => `Count: ${count()}`);
-    },
-    onUnmount: () => cleanup?.()
-  })`${view}`;
 }
 ```
 
 **Signature:**
 ```typescript
-function bind<K extends keyof HTMLElement>(
-  el: HTMLElement,
-  prop: K,
-  getter: () => HTMLElement[K]
+function setText(
+  el: Element | null | undefined,
+  getter: () => any
 ): () => void
 ```
 
 **Returns:** A cleanup function to stop the effect
 
-### `bindAttr` - Attribute Binding
+### `bindAttr` (Deprecated)
 
-Bind a reactive signal to a DOM element attribute:
+> ⚠️ **Deprecated**: Use `attr()` instead. This will be removed in a future version.
 
 ```typescript
-function Form(): Component {
-  const isDisabled = signal(false);
-
-  const view = template({ root: 'button' })`
-    <button>Submit</button>
-  `;
-
-  let cleanup: (() => void) | undefined;
-
-  return template({
-    onMount: (_, parent) => {
-      const buttonEl = parent.querySelector('button')!;
-      cleanup = bindAttr(buttonEl, 'disabled', () => 
-        isDisabled() ? '' : null
-      );
-    },
-    onUnmount: () => cleanup?.()
-  })`${view}`;
-}
+// Old: bindAttr(button, 'disabled', () => isDisabled() ? 'disabled' : null)
+// New: attr(button, 'disabled', () => isDisabled())
 ```
-
-**Signature:**
-```typescript
-function bindAttr(
-  el: Element,
-  attr: string,
-  getter: () => string | null
-): () => void
-```
-
-**Returns:** A cleanup function to stop the effect
-
-**Notes:**
-- Return `null` to remove the attribute
-- Return a string (even empty string `''`) to set the attribute
 
 ### `text` - XSS Prevention
 
@@ -662,39 +751,162 @@ src/
   main.ts
 ```
 
-## Router Integration
+## Router
 
-Simple hash-based routing:
+NAF includes a built-in hash-based router for single-page applications:
 
 ```typescript
-import { signal, effect } from './util';
+import { createRouter } from './naf';
 
-const routes = {
-  '#/': () => HomePage(),
-  '#/about': () => AboutPage(),
-  '#/todos': () => TodoPage()
-};
+const router = createRouter({
+  root: document.querySelector('#app')!,
+  routes: {
+    '#/': () => HomePage(),
+    '#/about': () => AboutPage(),
+    '#/todos': () => TodoPage(),
+  },
+  notFound: () => template`<h1>404 - Page Not Found</h1>`,
+});
 
-let currentPage: Component | null = null;
+// Navigate programmatically
+router.navigate('#/about');
 
-function handleRoute() {
-  // Unmount old page
-  currentPage?.unmount?.();
-  
-  // Get route and render
-  const hash = window.location.hash || '#/';
-  const pageFactory = routes[hash] || routes['#/'];
-  currentPage = pageFactory();
-  
-  // Mount new page
-  const root = document.getElementById('app')!;
-  root.innerHTML = currentPage.html;
-  currentPage.mount(root);
+// Get current route
+console.log(router.current()); // '#/about'
+
+// Clean up when done
+router.destroy();
+```
+
+**Signature:**
+```typescript
+function createRouter(options: RouterOptions): Router
+
+interface RouterOptions {
+  root: Element;
+  routes: Record<string, () => Component>;
+  notFound?: () => Component;
 }
 
-window.addEventListener('hashchange', handleRoute);
-handleRoute(); // Initial route
+interface Router {
+  navigate: (path: string) => void;
+  current: () => string;
+  destroy: () => void;
+}
 ```
+
+**Features:**
+- Hash-based routing (#/path) for compatibility
+- Automatically handles browser navigation (back/forward)
+- Cleans up previous page before mounting new one
+- Optional 404 component
+- Programmatic navigation
+- Cleanup on destroy
+
+**Example with navigation links:**
+```typescript
+function Header(): Component {
+  return template`
+    <nav>
+      <a href="#/">Home</a>
+      <a href="#/about">About</a>
+      <a href="#/todos">Todos</a>
+    </nav>
+  `;
+}
+```
+
+## DOM Utilities
+
+NAF provides convenient DOM query and manipulation helpers:
+
+### `$` - Query Selector Shorthand
+
+```typescript
+const input = $<HTMLInputElement>(el, 'input[type="text"]');
+```
+
+**Signature:**
+```typescript
+function $<T extends Element = Element>(
+  root: Element | Document,
+  selector: string
+): T | null
+```
+
+### `$$` - Query Selector All (as Array)
+
+Returns an array instead of NodeList, enabling array methods:
+
+```typescript
+const buttons = $$<HTMLButtonElement>(el, 'button');
+buttons.forEach(btn => console.log(btn.textContent));
+buttons.map(btn => btn.disabled = true);
+```
+
+**Signature:**
+```typescript
+function $$<T extends Element = Element>(
+  root: Element | Document,
+  selector: string
+): T[]
+```
+
+### `$on` - Query and Attach Event
+
+Finds an element and attaches an event listener in one call:
+
+```typescript
+$on(el, 'button', 'click', () => handleClick());
+
+// Returns element for chaining
+const form = $on(el, 'form', 'submit', handleSubmit);
+if (form) {
+  $on(form, 'input', 'change', handleChange);
+}
+```
+
+**Signature:**
+```typescript
+function $on<T extends Element = Element>(
+  root: Element,
+  selector: string,
+  event: string,
+  handler: (e: Event) => void
+): T | null
+```
+
+### `model` - Two-Way Data Binding
+
+Creates two-way binding between an input element and a signal:
+
+```typescript
+const text = signal('');
+model(el, 'input[name="username"]', text);
+
+// With reactive sync (updates input when signal changes externally)
+model(el, 'input', text, { reactive: true });
+
+// For checkboxes
+const checked = signal(false);
+model(el, 'input[type="checkbox"]', checked, { type: 'checkbox' });
+```
+
+**Signature:**
+```typescript
+function model<T extends HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(
+  root: Element,
+  selector: string,
+  sig: { (): any; (value: any): any },
+  options?: { reactive?: boolean; type?: 'text' | 'checkbox' | 'radio' }
+): T | null
+```
+
+**Features:**
+- Sets initial value from signal
+- Listens to input/change events
+- Optional reactive mode syncs input when signal changes externally
+- Supports text inputs, textareas, selects, checkboxes, and radio buttons
 
 ## Performance Tips
 
@@ -873,7 +1085,7 @@ npm run test:coverage # Generate coverage report
 
 ```
 naf/
-├── naf.ts              # Main library (~2KB) - Copy this file!
+├── naf.ts              # Main library (~1.3KB gzipped) - Copy this file!
 ├── test/               # Test suite
 │   ├── reactivity.test.ts
 │   └── components.test.ts
@@ -892,7 +1104,7 @@ NAF embraces a **copy-first approach** - we encourage you to copy `naf.ts` direc
 
 This lib prioritizes:
 1. **Simplicity** - Easy to understand, no magic
-2. **Size** - < 2KB gzipped for the runtime
+2. **Size** - ~1.3KB gzipped for the runtime
 3. **No dependencies** - Fully self-contained
 4. **No build step** - Works directly in the browser
 5. **Honest trade-offs** - Clear about what it can't do

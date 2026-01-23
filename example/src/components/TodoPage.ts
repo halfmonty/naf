@@ -61,25 +61,18 @@ export function TodoPage(): Component {
       ${AddTodoForm({ newTodoText, onAdd: addTodo })}
       ${FilterButtons({ currentFilter: filter })}
       ${when(
-        () => {
-          const filtered = filteredTodos();
-          return filtered.length > 0;
-        },
-        () => {
-          const filtered = filteredTodos();
-          return TodoList({
+        () => filteredTodos(),
+        (filtered) =>
+          TodoList({
             todos: filtered,
             onToggle: toggleTodo,
             onDelete: deleteTodo,
-          });
-        },
+          }),
         () => EmptyState({ filter: filter() }),
       )}
-      ${template /*html*/ `
-        <div class="stats-wrapper">
+
+      <div class="stats-wrapper">
           ${Stats({ activeCount, totalCount })}
-        </div>
-      `}
-    </div>
+      </div>
   `;
 }
