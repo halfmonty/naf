@@ -8,9 +8,7 @@ import {
   $,
   $$,
   $on,
-  setText,
-  toggleClass,
-  attr,
+  fx,
   list,
   type Todo,
   type Filter,
@@ -39,9 +37,12 @@ const activeCount = computed(() => todos().filter((t) => !t.done).length);
 $$(".todo-item").forEach((el) => el.remove());
 
 // Bind stats
-setText($(".active-count"), activeCount);
-setText($(".active-label"), () =>
-  activeCount() === 1 ? "item remaining" : "items remaining"
+fx($(".active-count"), (el) => (el.textContent = String(activeCount())));
+fx(
+  $(".active-label"),
+  (el) =>
+    (el.textContent =
+      activeCount() === 1 ? "item remaining" : "items remaining"),
 );
 
 // Bind form
@@ -49,8 +50,8 @@ const form = $<HTMLFormElement>(".add-todo-form")!;
 const input = $<HTMLInputElement>('input[name="text"]', form)!;
 const submitBtn = $<HTMLButtonElement>("button", form)!;
 
-input.addEventListener("input", () => newText(input.value));
-attr(submitBtn, "disabled", () => !newText().trim());
+$on(input, "input", () => newText(input.value));
+fx(submitBtn, (el) => el.toggleAttribute("disabled", !newText().trim()));
 
 $on(form, "submit", (e) => {
   e.preventDefault();
@@ -68,7 +69,7 @@ $$<HTMLButtonElement>(".filters button").forEach((btn) => {
   const filterValue = btn.dataset.filter as Filter;
 
   $on(btn, "click", () => filter(filterValue));
-  toggleClass(btn, "active", () => filter() === filterValue);
+  fx(btn, (el) => el.classList.toggle("active", filter() === filterValue));
 });
 
 // Bind todo list
@@ -78,28 +79,29 @@ list(
   filteredTodos,
   (t) => t.id,
   (el, item) => {
-    const c1 = setText($(".todo-text", el), () => item().text);
-    const c2 = toggleClass(el, "done", () => item().done);
+    const c1 = fx($(".todo-text", el), (e) => (e.textContent = item().text));
+    const c2 = fx(el, (e) => e.classList.toggle("done", item().done));
 
     const checkbox = $<HTMLInputElement>('input[type="checkbox"]', el)!;
-    checkbox.checked = item().done;
-    checkbox.addEventListener("change", () => {
+    const c3 = fx(checkbox, (cb) => (cb.checked = item().done));
+    $on(checkbox, "change", () => {
       todos(
         todos().map((t) =>
-          t.id === item().id ? { ...t, done: checkbox.checked } : t
-        )
+          t.id === item().id ? { ...t, done: checkbox.checked } : t,
+        ),
       );
     });
 
-    $on($(".danger", el)!, "click", () => {
+    $on($(".danger", el), "click", () => {
       todos(todos().filter((t) => t.id !== item().id));
     });
 
     return () => {
       c1();
       c2();
+      c3();
     };
-  }
+  },
 );
 
 console.log("NAF-HTML todo page loaded");

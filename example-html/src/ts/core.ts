@@ -12,15 +12,12 @@ export {
   $$,
   $on,
   text,
-  setText,
-  toggleClass,
-  attr,
+  fx,
   model,
-  bind,
   list,
 } from "../../../naf-html";
 
-export type { Signal, Computed, Binding } from "../../../naf-html";
+export type { Signal, Computed } from "../../../naf-html";
 
 // Shared types
 export interface Todo {

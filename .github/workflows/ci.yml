@@ -76,12 +76,28 @@ jobs:
           npm ci
           npm run build
 
+      - name: Build VanJS example
+        run: |
+          cd example-vanjs
+          npm ci
+          npm run build
+
+      - name: Build Plain JS example
+        run: |
+          cd example-plain
+          npm ci
+          npm run build
+
       - name: Combine dist folders
         run: |
           mkdir -p dist
           cp -r example/dist/* dist/
           mkdir -p dist/html
           cp -r example-html/dist/* dist/html/
+          mkdir -p dist/vanjs
+          cp -r example-vanjs/dist/* dist/vanjs/
+          mkdir -p dist/plain
+          cp -r example-plain/dist/* dist/plain/
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

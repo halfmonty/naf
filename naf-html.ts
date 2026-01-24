@@ -26,16 +26,6 @@ export type Signal<T> = { (): T; (value: T): T };
  */
 export type Computed<T> = () => T;
 
-/**
- * Binding interface for bind() function.
- */
-export interface Binding {
-  /** Called when binding is activated */
-  mount: () => void;
-  /** Called when binding is deactivated */
-  unmount?: () => void;
-}
-
 // ============================================================================
 // REACTIVITY SYSTEM
 // ============================================================================
@@ -163,13 +153,18 @@ export function effect(fn: () => void): () => void {
  * @example
  * const safe = text('<script>alert("xss")</script>');
  */
-export function text(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+export function text(s: string): string {
+  return s.replace(
+    /[&<>"']/g,
+    (c) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[c]!,
+  );
 }
 
 /**
@@ -201,37 +196,18 @@ export function $$<T extends Element = Element>(
 }
 
 /**
- * Attaches event listener. Can bind directly to element or find child first.
+ * Attaches event listener to an element.
  *
  * @example
- * $on(myButton, 'click', handler);           // direct binding
- * $on(form, 'button', 'click', handler);     // finds child first
+ * $on(btn, 'click', handler);
+ * $on($('button', form), 'click', handler);
  */
-export function $on<T extends Element = Element>(
-  el: T,
+export function $on<T extends Element>(
+  el: T | null,
   event: string,
   handler: (e: Event) => void,
-): T;
-export function $on<T extends Element = Element>(
-  root: Element,
-  selector: string,
-  event: string,
-  handler: (e: Event) => void,
-): T | null;
-export function $on<T extends Element = Element>(
-  elOrRoot: Element,
-  eventOrSelector: string,
-  handlerOrEvent: string | ((e: Event) => void),
-  maybeHandler?: (e: Event) => void,
 ): T | null {
-  if (typeof handlerOrEvent === "function") {
-    // Direct: $on(el, event, handler)
-    elOrRoot.addEventListener(eventOrSelector, handlerOrEvent);
-    return elOrRoot as T;
-  }
-  // Selector: $on(root, selector, event, handler)
-  const el = elOrRoot.querySelector<T>(eventOrSelector);
-  if (el) el.addEventListener(handlerOrEvent, maybeHandler!);
+  el?.addEventListener(event, handler);
   return el;
 }
 
@@ -240,146 +216,56 @@ export function $on<T extends Element = Element>(
 // ============================================================================
 
 /**
- * Reactively binds a value to an element's textContent.
+ * Binds a reactive effect to an element. Runs immediately and re-runs
+ * whenever any accessed signals change. Use native DOM APIs inside.
  *
  * @example
- * const count = signal(0);
- * setText($('#counter'), () => count());
+ * fx($('#count'), el => el.textContent = String(count()));
+ * fx(btn, el => el.classList.toggle('active', isActive()));
+ * fx(btn, el => el.toggleAttribute('disabled', !isValid()));
+ * fx(link, el => el.setAttribute('href', currentUrl()));
  */
-export function setText(
-  el: Element | null | undefined,
-  getter: () => unknown,
+export function fx<T extends Element>(
+  el: T | null | undefined,
+  fn: (el: T) => void,
 ): () => void {
   if (!el) return () => {};
-  return effect(() => {
-    el.textContent = String(getter());
-  });
-}
-
-/**
- * Reactively toggles a CSS class based on condition.
- *
- * @example
- * const isActive = signal(false);
- * toggleClass(btn, 'active', () => isActive());
- */
-export function toggleClass(
-  el: Element | null | undefined,
-  className: string,
-  condition: () => boolean,
-): () => void {
-  if (!el) return () => {};
-  return effect(() => {
-    el.classList.toggle(className, condition());
-  });
-}
-
-/**
- * Reactively binds a value to an element attribute.
- * - true: sets attribute with empty string (boolean attribute)
- * - false/null: removes attribute
- * - string: sets attribute value
- *
- * @example
- * attr(btn, 'disabled', () => !isValid());
- * attr(link, 'href', () => currentUrl());
- */
-export function attr(
-  el: Element | null | undefined,
-  name: string,
-  value: () => string | boolean | null,
-): () => void {
-  if (!el) return () => {};
-  return effect(() => {
-    const v = value();
-    if (v === false || v === null) {
-      el.removeAttribute(name);
-    } else if (v === true) {
-      el.setAttribute(name, "");
-    } else {
-      el.setAttribute(name, v);
-    }
-  });
+  return effect(() => fn(el));
 }
 
 /**
  * Two-way binding between input and signal.
- * Can bind directly to element or find child first.
+ * Auto-detects checkbox type from element.
  *
  * @example
- * model(myInput, nameSig);                        // direct binding
- * model(form, 'input[name="email"]', emailSig);   // finds child first
+ * model(input, nameSig);
+ * model(checkbox, checkedSig);
+ * model(input, valueSig, { reactive: true }); // sync signal changes back to input
  */
 export function model<
   T extends HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement,
 >(
-  el: T,
+  el: T | null,
   sig: Signal<unknown>,
-  options?: { reactive?: boolean; type?: "text" | "checkbox" | "radio" },
-): T;
-export function model<
-  T extends HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement,
->(
-  root: Element,
-  selector: string,
-  sig: Signal<unknown>,
-  options?: { reactive?: boolean; type?: "text" | "checkbox" | "radio" },
-): T | null;
-export function model<
-  T extends HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement,
->(
-  elOrRoot: Element,
-  selectorOrSig: string | Signal<unknown>,
-  sigOrOptions?:
-    | Signal<unknown>
-    | { reactive?: boolean; type?: "text" | "checkbox" | "radio" },
-  maybeOptions?: { reactive?: boolean; type?: "text" | "checkbox" | "radio" },
+  options?: { reactive?: boolean },
 ): T | null {
-  let el: T | null;
-  let sig: Signal<unknown>;
-  let options:
-    | { reactive?: boolean; type?: "text" | "checkbox" | "radio" }
-    | undefined;
-
-  if (typeof selectorOrSig === "function") {
-    // Direct: model(el, sig, options?)
-    el = elOrRoot as T;
-    sig = selectorOrSig;
-    options = sigOrOptions as typeof options;
-  } else {
-    // Selector: model(root, selector, sig, options?)
-    el = elOrRoot.querySelector<T>(selectorOrSig);
-    sig = sigOrOptions as Signal<unknown>;
-    options = maybeOptions;
-  }
-
   if (!el) return null;
 
-  const type = options?.type || "text";
+  const isCheckbox = el instanceof HTMLInputElement && el.type === "checkbox";
 
-  if (type === "checkbox" && el instanceof HTMLInputElement) {
-    el.checked = sig() as boolean;
-  } else if ("value" in el) {
-    el.value = sig() as string;
-  }
+  if (isCheckbox) el.checked = sig() as boolean;
+  else if ("value" in el) el.value = sig() as string;
 
-  const eventType = type === "checkbox" ? "change" : "input";
-  el.addEventListener(eventType, () => {
-    if (type === "checkbox" && el instanceof HTMLInputElement) {
-      sig(el.checked);
-    } else if ("value" in el) {
-      sig(el.value);
-    }
+  el.addEventListener(isCheckbox ? "change" : "input", () => {
+    if (isCheckbox) sig(el.checked);
+    else if ("value" in el) sig(el.value);
   });
 
   if (options?.reactive) {
     effect(() => {
       const value = sig();
-      if (type === "checkbox" && el instanceof HTMLInputElement) {
-        el.checked = value as boolean;
-      } else if ("value" in el && el.value !== value) {
-        el.value = value as string;
-      }
+      if (isCheckbox) el.checked = value as boolean;
+      else if ("value" in el && el.value !== value) el.value = value as string;
     });
   }
 
@@ -387,33 +273,8 @@ export function model<
 }
 
 // ============================================================================
-// HTML-FIRST BINDINGS
+// LIST RENDERING
 // ============================================================================
-
-/**
- * Binds reactive behavior to an existing DOM element.
- * Returns cleanup function.
- *
- * @example
- * const cleanup = bind($('#counter')!, (el) => ({
- *   mount() {
- *     setText($('.count', el), () => count());
- *     $on(el, 'button', 'click', () => count(count() + 1));
- *   },
- *   unmount() {
- *     console.log('cleaned up');
- *   }
- * }));
- */
-export function bind(
-  el: Element | null,
-  setup: (el: Element) => Binding | void,
-): () => void {
-  if (!el) return () => {};
-  const binding = setup(el);
-  binding?.mount();
-  return () => binding?.unmount?.();
-}
 
 /**
  * Renders a keyed list from a template element.
@@ -434,8 +295,8 @@ export function bind(
  *   () => todos(),
  *   (t) => t.id,
  *   (el, item) => {
- *     const c1 = setText($('.text', el), () => item().text);
- *     const c2 = toggleClass(el, 'done', () => item().done);
+ *     const c1 = fx($('.text', el), e => e.textContent = item().text);
+ *     const c2 = fx(el, e => e.classList.toggle('done', item().done));
  *     return () => { c1(); c2(); }; // optional cleanup
  *   }
  * );
@@ -453,24 +314,26 @@ export function list<T>(
 ): () => void {
   if (!container || !templateEl) return () => {};
 
-  const keyToEl = new Map<string | number, Element>();
-  const keyToItem = new Map<string | number, Signal<T>>();
-  const keyToIndex = new Map<string | number, Signal<number>>();
-  const keyToCleanup = new Map<string | number, () => void>();
+  const entries = new Map<
+    string | number,
+    {
+      el: Element;
+      item: Signal<T>;
+      index: Signal<number>;
+      cleanup?: () => void;
+    }
+  >();
 
   const stopEffect = effect(() => {
     const arr = items();
     const newKeys = new Set(arr.map(key));
 
     // Remove elements for deleted keys
-    for (const [k, el] of keyToEl) {
+    for (const [k, entry] of entries) {
       if (!newKeys.has(k)) {
-        keyToCleanup.get(k)?.();
-        el.remove();
-        keyToEl.delete(k);
-        keyToItem.delete(k);
-        keyToIndex.delete(k);
-        keyToCleanup.delete(k);
+        entry.cleanup?.();
+        entry.el.remove();
+        entries.delete(k);
       }
     }
 
@@ -479,49 +342,47 @@ export function list<T>(
     for (let i = 0; i < arr.length; i++) {
       const item = arr[i];
       const k = key(item);
-      let el = keyToEl.get(k);
+      let entry = entries.get(k);
 
-      if (!el) {
+      if (!entry) {
         // New item - clone and setup
-        el = templateEl.content.firstElementChild!.cloneNode(true) as Element;
+        const el = templateEl.content.firstElementChild!.cloneNode(
+          true,
+        ) as Element;
         const itemSig = signal(item);
         const indexSig = signal(i);
-        keyToEl.set(k, el);
-        keyToItem.set(k, itemSig);
-        keyToIndex.set(k, indexSig);
+        entry = { el, item: itemSig, index: indexSig };
+        entries.set(k, entry);
 
         const cleanup = setup(
           el,
           () => itemSig(),
           () => indexSig(),
         );
-        if (cleanup) keyToCleanup.set(k, cleanup);
+        if (cleanup) entry.cleanup = cleanup;
       } else {
         // Existing item - update signals
-        keyToItem.get(k)!(item);
-        keyToIndex.get(k)!(i);
+        entry.item(item);
+        entry.index(i);
       }
 
       // Position correctly in DOM
       if (prevEl) {
-        if (el.previousElementSibling !== prevEl) {
-          prevEl.after(el);
+        if (entry.el.previousElementSibling !== prevEl) {
+          prevEl.after(entry.el);
         }
       } else {
-        if (el !== container.firstElementChild) {
-          container.prepend(el);
+        if (entry.el !== container.firstElementChild) {
+          container.prepend(entry.el);
         }
       }
-      prevEl = el;
+      prevEl = entry.el;
     }
   });
 
   return () => {
     stopEffect();
-    for (const cleanup of keyToCleanup.values()) cleanup();
-    keyToEl.clear();
-    keyToItem.clear();
-    keyToIndex.clear();
-    keyToCleanup.clear();
+    for (const entry of entries.values()) entry.cleanup?.();
+    entries.clear();
   };
 }
