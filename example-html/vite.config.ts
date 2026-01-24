@@ -1,8 +1,10 @@
 import { defineConfig } from "vite";
 import htmlPartials from "./vite.plugin.partials";
 
+const base = process.env.CI ? "/naf/html/" : "/";
+
 export default defineConfig({
-  base: process.env.CI ? "/naf/html/" : "/",
+  base,
   plugins: [
     // Redirect /foo to /foo/ for clean URLs
     {
@@ -17,6 +19,13 @@ export default defineConfig({
           }
           next();
         });
+      },
+    },
+    // Rewrite <base href="/"> to use configured base path
+    {
+      name: "base-href",
+      transformIndexHtml(html) {
+        return html.replace(/<base href="\/"[^>]*>/, `<base href="${base}">`);
       },
     },
     htmlPartials({
