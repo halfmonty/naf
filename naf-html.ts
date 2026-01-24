@@ -202,6 +202,16 @@ export function $$<T extends Element = Element>(
  * $on(btn, 'click', handler);
  * $on($('button', form), 'click', handler);
  */
+export function $on<T extends Element, K extends keyof HTMLElementEventMap>(
+  el: T | null,
+  event: K,
+  handler: (e: HTMLElementEventMap[K]) => void,
+): T | null;
+export function $on<T extends Element>(
+  el: T | null,
+  event: string,
+  handler: (e: Event) => void,
+): T | null;
 export function $on<T extends Element>(
   el: T | null,
   event: string,
