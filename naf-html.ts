@@ -254,11 +254,8 @@ export function fx<T extends Element>(
  */
 export function model<
   T extends HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement,
->(
-  el: T | null,
-  sig: Signal<unknown>,
-  options?: { reactive?: boolean },
-): T | null {
+  V,
+>(el: T | null, sig: Signal<V>, options?: { reactive?: boolean }): T | null {
   if (!el) return null;
 
   const isCheckbox = el instanceof HTMLInputElement && el.type === "checkbox";
@@ -267,8 +264,8 @@ export function model<
   else if ("value" in el) el.value = sig() as string;
 
   el.addEventListener(isCheckbox ? "change" : "input", () => {
-    if (isCheckbox) sig(el.checked);
-    else if ("value" in el) sig(el.value);
+    if (isCheckbox) sig(el.checked as V);
+    else if ("value" in el) sig(el.value as V);
   });
 
   if (options?.reactive) {

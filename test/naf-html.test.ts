@@ -319,7 +319,7 @@ describe("NAF-HTML", () => {
   describe("$on", () => {
     it("should attach event listener", () => {
       container.innerHTML = "<button>Click</button>";
-      const btn = $("button", container)!;
+      const btn = $<HTMLButtonElement>("button", container)!;
       const handler = vi.fn();
 
       $on(btn, "click", handler);
