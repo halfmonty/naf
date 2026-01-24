@@ -52,7 +52,7 @@ jobs:
           files: ./coverage/coverage-final.json
           fail_ci_if_error: false
 
-  build-example:
+  build-examples:
     runs-on: ubuntu-latest
 
     steps:
@@ -64,20 +64,33 @@ jobs:
           node-version: "20.x"
           cache: "npm"
 
-      - name: Build example app
+      - name: Build SPA example
         run: |
           cd example
           npm ci
           npm run build
 
+      - name: Build HTML-first example
+        run: |
+          cd example-html
+          npm ci
+          npm run build
+
+      - name: Combine dist folders
+        run: |
+          mkdir -p dist
+          cp -r example/dist/* dist/
+          mkdir -p dist/html
+          cp -r example-html/dist/* dist/html/
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./example/dist
+          path: ./dist
 
   deploy:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    needs: [test, build-example]
+    needs: [test, build-examples]
     runs-on: ubuntu-latest
     environment:
       name: github-pages
